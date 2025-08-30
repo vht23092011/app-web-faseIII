@@ -1,41 +1,71 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import requests
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path="", static_folder=".")
 
 API_KEY = "OLBXRaXK8m9MrmPa8O_d3QV2nH_oGJ0fBCZ3d-b5dwIZ"
-DEPLOYMENT_URL = "https://us-south.ml.cloud.ibm.com/ml/v4/deployments/TU_DEPLOYMENT_ID/predictions?version=2021-05-01"
+DEPLOYMENT_URL = "https://us-south.ml.cloud.ibm.com/ml/v4/deployments/a5c43d4f-8e9f-40a4-86fb-ee6694f42ccb/predictions?version=2021-05-01"
 
-def get_token():
-    r = requests.post("https://iam.cloud.ibm.com/identity/token",
-                      data={"apikey": API_KEY, "grant_type": "urn:ibm:params:oauth:grant-type:apikey"},
-                      headers={"Content-Type": "application/x-www-form-urlencoded"})
-    return r.json().get("access_token", "")
+
+def obtener_token():
+    response = requests.post(
+        "https://iam.cloud.ibm.com/identity/token",
+        data={
+            "apikey": API_KEY,
+            "grant_type": "urn:ibm:params:oauth:grant-type:apikey"
+        },
+        headers={"Content-Type": "application/x-www-form-urlencoded"})
+    return response.json()["access_token"]
+
+
+@app.route("/")
+def index():
+    return send_from_directory(".", "index.html")
+
 
 @app.route("/api/predict", methods=["POST"])
-def predict():
-    values = request.json["values"]
-    token = get_token()
-    payload = { "input_data": [{
-        "fields": ["Animal_ID", "Día", "Alimento_Consumido_kg", "Pasos_por_día", "Horas_de_Reposo", "Temperatura_Corp_C", "Nivel_Actividad"],
-        "values": [[v["Animal_ID"], int(v["Día"]), float(v["Alimento_Consumido_kg"]), int(v["Pasos_por_día"]),
-                    float(v["Horas_de_Reposo"]), float(v["Temperatura_Corp_C"]), v["Nivel_Actividad"]] for v in values]
-    }]}
+def predecir():
+    datos = request.get_json()
+    if not datos or "values" not in datos or not datos["values"]:
+        return jsonify({"error": "Datos inválidos"}), 400
 
-    r = requests.post(DEPLOYMENT_URL, headers={
-        "Authorization": "Bearer " + token,
+    token = obtener_token()
+    payload = {
+        "input_data": [{
+            "fields": [
+                "Animal_ID", "Día", "Alimento_Consumido_kg", "Pasos_por_día",
+                "Horas_de_Reposo", "Temperatura_Corp_C", "Nivel_Actividad"
+            ],
+            "values":
+            datos["values"]
+        }]
+    }
+
+    headers = {
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
-    }, json=payload)
+    }
 
-    if r.status_code == 200:
-        pred = r.json()["predictions"][0]["values"]
-        result = []
-        for i, val in enumerate(values):
-            val["prediction"] = pred[i][0]
-            result.append(val)
-        return jsonify(result)
-    else:
-        return jsonify({"error": r.text}), 500
+    try:
+        r = requests.post(DEPLOYMENT_URL, headers=headers, json=payload)
+        predicciones = r.json()["predictions"][0]["values"]
+        resultados = []
+        for i, p in enumerate(predicciones):
+            row = datos["values"][i]
+            resultados.append({
+                "Animal_ID": row[0],
+                "Día": row[1],
+                "Alimento_Consumido_kg": row[2],
+                "Pasos_por_día": row[3],
+                "Horas_de_Reposo": row[4],
+                "Temperatura_Corp_C": row[5],
+                "Nivel_Actividad": row[6],
+                "prediction": p[0]
+            })
+        return jsonify(resultados)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    app.run(host="0.0.0.0", port=5000)
