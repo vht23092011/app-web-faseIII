@@ -1,10 +1,11 @@
 from flask import Flask, request, jsonify, send_from_directory
 import requests
+import os
 
 app = Flask(__name__, static_url_path="", static_folder=".")
 
-API_KEY = "OLBXRaXK8m9MrmPa8O_d3QV2nH_oGJ0fBCZ3d-b5dwIZ"
-DEPLOYMENT_URL = "https://us-south.ml.cloud.ibm.com/ml/v4/deployments/a5c43d4f-8e9f-40a4-86fb-ee6694f42ccb/predictions?version=2021-05-01"
+API_KEY = os.getenv("IBM_API_KEY")
+API_KEY = os.getenv("DEPLOYMENT_URL")
 
 
 def obtener_token():
