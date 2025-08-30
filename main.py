@@ -5,8 +5,7 @@ import os
 app = Flask(__name__, static_url_path="", static_folder=".")
 
 API_KEY = os.getenv("IBM_API_KEY")
-API_KEY = os.getenv("DEPLOYMENT_URL")
-
+DEPLOYMENT_URL = os.getenv("DEPLOYMENT_URL")  # <- esto estaba mal
 
 def obtener_token():
     response = requests.post(
